@@ -141,23 +141,23 @@ DEF_GPIO_FN_PROTOS(1)
 #undef GPIO_FN_PROTOS
 
 // Generated fast write functions:
-// void gpio0_write_fast32(unsigned long)
-// void gpio0_write_fast16_u(unsigned short)
-// void gpio0_write_fast16_l(unsigned short)
-// void gpio0_write_fast8_0(unsigned char)
-// void gpio0_write_fast8_1(unsigned char)
-// void gpio0_write_fast8_2(unsigned char)
-// void gpio0_write_fast8_3(unsigned char)
+// static inline void gpio0_write_fast32(unsigned long)
+// static inline void gpio0_write_fast16_u(unsigned short)
+// static inline void gpio0_write_fast16_l(unsigned short)
+// static inline void gpio0_write_fast8_0(unsigned char)
+// static inline void gpio0_write_fast8_1(unsigned char)
+// static inline void gpio0_write_fast8_2(unsigned char)
+// static inline void gpio0_write_fast8_3(unsigned char)
 // Similarly instead of write, also set, clr, set_mask, set_dir, make_output, make_input
 //
 // Generated fast read functions:
-// unsigned long gpio0_read_fast32()
-// unsigned short gpio0_read_fast16_u()
-// unsigned short gpio0_read_fast16_l()
-// unsigned char gpio0_read_fast8_0()
-// unsigned char gpio0_read_fast8_1()
-// unsigned char gpio0_read_fast8_2()
-// unsigned char gpio0_read_fast8_3()
+// static inline unsigned long gpio0_read_fast32()
+// static inline unsigned short gpio0_read_fast16_u()
+// static inline unsigned short gpio0_read_fast16_l()
+// static inline unsigned char gpio0_read_fast8_0()
+// static inline unsigned char gpio0_read_fast8_1()
+// static inline unsigned char gpio0_read_fast8_2()
+// static inline unsigned char gpio0_read_fast8_3()
 // Similarly instead of read, also get_mask, get_dir
 //
 // Generated slow functions:
@@ -173,5 +173,62 @@ DEF_GPIO_FN_PROTOS(1)
 // void gpio0_make_input(int)
 //
 // And all of the above for gpio1 as well.
+
+static inline void gpio_make_pin_input_fast(int port, unsigned long mask)
+{
+  switch(port)
+  {
+    case 0 :
+      gpio0_set_dir_fast32(gpio0_get_dir_fast32() & ~mask);
+      break;
+    case 1 :
+      gpio1_set_dir_fast32(gpio1_get_dir_fast32() & ~mask);
+      break;
+  }
+}
+
+static inline void gpio_make_pin_output_fast(int port, unsigned long mask)
+{
+  switch(port)
+  {
+    case 0 :
+      gpio0_set_dir_fast32(gpio0_get_dir_fast32() | mask);
+      break;
+    case 1 :
+      gpio1_set_dir_fast32(gpio1_get_dir_fast32() | mask);
+      break;
+  }
+}
+
+static inline void gpio_pin_write_fast(int port, unsigned long mask, unsigned long value)
+{
+  switch (port)
+  {
+    case 0 :
+      gpio0_set_mask_fast32(0xffffffff & ~mask);
+      gpio0_write_fast32(value);
+      break;
+    case 1 :
+      gpio1_set_mask_fast32(0xffffffff & ~mask);
+      gpio1_write_fast32(value);
+      break;
+  }
+}
+
+static inline unsigned long gpio_pin_read_fast(int port, unsigned long mask)
+{
+  switch(port)
+  {
+    case 0 :
+      gpio0_set_mask_fast32(0xffffffff & ~mask);
+      return gpio0_read_fast32();
+      break;
+    case 1 :
+      gpio1_set_mask_fast32(0xffffffff & ~mask);
+      return gpio1_read_fast32();
+      break;
+  }
+  return 0;
+}
 
 #endif /* INCLUDE_GPIO_H_ */
