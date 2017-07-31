@@ -133,7 +133,24 @@ void internal_timer_start_periodic(int timer_num, unsigned long period, internal
 
 void internal_timer_start_oneshot(int timer_num, unsigned long delay, internal_timer_callback* cb, void *cb_data)
 {
+  volatile unsigned long *timer_base;
+  timer_base = (
+      timer_num == 0 ?
+          (volatile unsigned long *) TMR0_BASE_ADDR :
+          (volatile unsigned long *) TMR1_BASE_ADDR);
 
+  callbacks[timer_num] = cb;
+  callback_data[timer_num] = cb_data;
+
+  // Use Match 0
+  *(timer_base + TIMER_MR0) = delay;
+
+  // Interrupt and stop the timer on match
+  *(timer_base + TIMER_MCR) = 0x5;
+
+  // Reset and start the timer
+  *(timer_base + TIMER_TCR) = 2;
+  *(timer_base + TIMER_TCR) = 1;
 }
 
 static void internal_timer_isr()

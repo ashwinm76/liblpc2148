@@ -215,6 +215,11 @@ void uart_puts(int uart_num, const char *s)
   }
 }
 
+int uart_rx_count(int uart_num)
+{
+  return rx_count[uart_num];
+}
+
 static void uart_isr(int uart_num, volatile unsigned long *uart_base)
 {
   unsigned long status;
