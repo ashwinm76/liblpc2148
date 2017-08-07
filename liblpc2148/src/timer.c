@@ -5,6 +5,7 @@
  *      Author: Ashwin Menon
  */
 
+#include <stddef.h>
 #include "timer.h"
 #include "vic.h"
 #include "LPC214x.h"
@@ -27,17 +28,23 @@
 #define TIMER_EMR  (0x3C/sizeof(unsigned long))
 #define TIMER_CTCR (0x70/sizeof(unsigned long))
 
-internal_timer_callback *callbacks[2];
-void *callback_data[2];
-static void internal_timer_isr();
+internal_timer_callback *match_callbacks[2][8];
+static void internal_timer0_isr();
+static void internal_timer1_isr();
 
 void internal_timer_init(int timer_num, struct internal_timer_config cfg)
 {
+  int i;
   volatile unsigned long *timer_base;
   timer_base = (
       timer_num == 0 ?
           (volatile unsigned long *) TMR0_BASE_ADDR :
           (volatile unsigned long *) TMR1_BASE_ADDR);
+
+  for(i=0; i<4; i++)
+  {
+    match_callbacks[timer_num][i] = NULL;
+  }
 
   // Disable and reset the timer counter.
   *(timer_base + TIMER_TCR) = 2;
@@ -61,7 +68,10 @@ void internal_timer_init(int timer_num, struct internal_timer_config cfg)
   *(timer_base + TIMER_EMR) = 0;
 
   // Set up the TIMER ISR and enable it
-  vic_setup_isr(timer_num == 0 ? VIC_SRC_TIMER0 : VIC_SRC_TIMER1, VIC_INT_IRQ, cfg.interrupt_priority, internal_timer_isr);
+  vic_setup_isr(timer_num == 0 ? VIC_SRC_TIMER0 : VIC_SRC_TIMER1,
+      VIC_INT_IRQ,
+      cfg.interrupt_priority,
+      timer_num == 0 ? internal_timer0_isr : internal_timer1_isr);
   vic_interrupt_enable(1 << (timer_num == 0 ? VIC_SRC_TIMER0 : VIC_SRC_TIMER1));
 }
 
@@ -109,29 +119,53 @@ unsigned long internal_timer_read(int timer_num)
   return *(timer_base + TIMER_TC);
 }
 
-void internal_timer_start_periodic(int timer_num, unsigned long period, internal_timer_callback* cb, void *cb_data)
+void internal_timer_setup_match(int timer_num,
+                                   unsigned long period,
+                                   enum internal_timer_match_number match_num,
+                                   enum internal_timer_match_action action,
+                                   enum internal_timer_ext_match_action ext_action,
+                                   int oneshot,
+                                   internal_timer_callback* cb)
 {
+  unsigned long mr;
+
   volatile unsigned long *timer_base;
     timer_base = (
         timer_num == 0 ?
             (volatile unsigned long *) TMR0_BASE_ADDR :
             (volatile unsigned long *) TMR1_BASE_ADDR);
 
-    callbacks[timer_num] = cb;
-    callback_data[timer_num] = cb_data;
+    // Use Match 0 by default
+    switch(match_num)
+    {
+      case MATCH1: mr = TIMER_MR1; break;
+      case MATCH2: mr = TIMER_MR2; break;
+      case MATCH3: mr = TIMER_MR3; break;
+      default: mr = TIMER_MR0; break; //  MATCH0
+    }
+    *(timer_base + mr) = period;
 
-    // Use Match 0
-    *(timer_base + TIMER_MR0) = period;
+    // Configure external match
+    *(timer_base + TIMER_EMR) &= ~3 << (4 + (2 * match_num));
+    *(timer_base + TIMER_EMR) |= ext_action << (4 + (2 * match_num));
 
-    // Interrupt and reset the timer on match
-    *(timer_base + TIMER_MCR) = 3;
-
-    // Reset and start the timer
-    *(timer_base + TIMER_TCR) = 2;
-    *(timer_base + TIMER_TCR) = 1;
+    // Interrupt (if required) and reset the timer on match
+    *(timer_base + TIMER_MCR) &= ~7 << (3 * match_num);
+    if (cb)
+    {
+      match_callbacks[timer_num][match_num] = cb;
+      *(timer_base + TIMER_MCR) |= ((action << 1) + 1) << (3 * match_num);
+    }
+    else
+    {
+      *(timer_base + TIMER_MCR) |= (action << 1) << (3 * match_num);
+    }
 }
 
-void internal_timer_start_oneshot(int timer_num, unsigned long delay, internal_timer_callback* cb, void *cb_data)
+void internal_timer_setup_capture(int timer_num,
+                                  enum internal_timer_capture_number cap_num,
+                                  enum internal_timer_capture_edge edge,
+                                  internal_timer_callback* cb)
 {
   volatile unsigned long *timer_base;
   timer_base = (
@@ -139,48 +173,70 @@ void internal_timer_start_oneshot(int timer_num, unsigned long delay, internal_t
           (volatile unsigned long *) TMR0_BASE_ADDR :
           (volatile unsigned long *) TMR1_BASE_ADDR);
 
-  callbacks[timer_num] = cb;
-  callback_data[timer_num] = cb_data;
-
-  // Use Match 0
-  *(timer_base + TIMER_MR0) = delay;
-
-  // Interrupt and stop the timer on match
-  *(timer_base + TIMER_MCR) = 0x5;
-
-  // Reset and start the timer
-  *(timer_base + TIMER_TCR) = 2;
-  *(timer_base + TIMER_TCR) = 1;
+  // Set up the capture edge and interrupt (if required)
+  *(timer_base + TIMER_CCR) &= ~7 << (3 * cap_num);
+  if (cb)
+  {
+    match_callbacks[timer_num][4+cap_num] = cb;
+    *(timer_base + TIMER_CCR) |= (4 + edge) << (3 * cap_num);
+  }
+  else
+  {
+    *(timer_base + TIMER_CCR) |= edge << (3 * cap_num);
+  }
 }
 
-static void internal_timer_isr()
+static void internal_timer0_isr()
 {
-  volatile unsigned long *timer_base = 0;
-  unsigned long status;
-  int timer_num;
+#define TIMER_BASE ((volatile unsigned long*)TMR0_BASE_ADDR)
+#define TIMER_NUM 0
 
-  if (VICIRQStatus & (1 << VIC_SRC_TIMER0))
-  {
-    timer_num = 0;
-    timer_base = (unsigned long*)TMR0_BASE_ADDR;
-  }
-  if (VICIRQStatus & (1 << VIC_SRC_TIMER1))
-  {
-    timer_num = 1;
-    timer_base = (unsigned long*)TMR1_BASE_ADDR;
-  }
-  if (timer_base == 0)
-  {
-    return;
-  }
+  int i = 0;
+  unsigned long status;
 
   // Read and clear the interrupt bit
-  status = *(timer_base + TIMER_IR);
-  *(timer_base + TIMER_IR) = status;
+  status = *(TIMER_BASE + TIMER_IR);
+  *(TIMER_BASE + TIMER_IR) = status;
 
-  // Call the callback if MR0 matches
-  if (status & 1)
+  // Call the callbacks
+  while(status)
   {
-    callbacks[timer_num](callback_data[timer_num]);
+    if ((status & 1) && match_callbacks[TIMER_NUM][i])
+    {
+      match_callbacks[TIMER_NUM][i]();
+    }
+    i++;
+    status >>= 1;
   }
+
+#undef TIMER_NUM
+#undef TIMER_BASE
 }
+
+static void internal_timer1_isr()
+{
+#define TIMER_BASE ((volatile unsigned long*)TMR1_BASE_ADDR)
+#define TIMER_NUM 1
+
+  int i = 0;
+  unsigned long status;
+
+  // Read and clear the interrupt bit
+  status = *(TIMER_BASE + TIMER_IR);
+  *(TIMER_BASE + TIMER_IR) = status;
+
+  // Call the callbacks
+  while(status)
+  {
+    if ((status & 1) && match_callbacks[TIMER_NUM][i])
+    {
+      match_callbacks[TIMER_NUM][i]();
+    }
+    i++;
+    status >>= 1;
+  }
+
+#undef TIMER_NUM
+#undef TIMER_BASE
+}
+
