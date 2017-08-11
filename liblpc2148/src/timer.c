@@ -186,6 +186,28 @@ void internal_timer_setup_capture(int timer_num,
   }
 }
 
+void internal_timer_set_match_output(int timer_num, enum internal_timer_match_number match_num)
+{
+  volatile unsigned long *timer_base;
+  timer_base = (
+      timer_num == 0 ?
+          (volatile unsigned long *) TMR0_BASE_ADDR :
+          (volatile unsigned long *) TMR1_BASE_ADDR);
+
+  *(timer_base + TIMER_EMR) = (*(timer_base + TIMER_EMR) | (1 << match_num)) & 0xfff;
+}
+
+void internal_timer_clr_match_output(int timer_num, enum internal_timer_match_number match_num)
+{
+  volatile unsigned long *timer_base;
+  timer_base = (
+      timer_num == 0 ?
+          (volatile unsigned long *) TMR0_BASE_ADDR :
+          (volatile unsigned long *) TMR1_BASE_ADDR);
+
+  *(timer_base + TIMER_EMR) = (*(timer_base + TIMER_EMR) & ~(1 << match_num)) & 0xfff;
+}
+
 static void internal_timer0_isr()
 {
 #define TIMER_BASE ((volatile unsigned long*)TMR0_BASE_ADDR)

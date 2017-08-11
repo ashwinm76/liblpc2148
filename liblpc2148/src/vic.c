@@ -8,16 +8,6 @@
 #include "vic.h"
 #include "LPC214x.h"
 
-void vic_interrupt_enable(unsigned long mask)
-{
-  VICIntEnable |= mask;
-}
-
-void vic_interrupt_disable(unsigned long mask)
-{
-  VICIntEnClr = mask;
-}
-
 void vic_setup_isr(enum vic_interrupt_source src, enum vic_interrupt_type type, unsigned int priority, vic_isr *isr)
 {
   if (priority > 15)

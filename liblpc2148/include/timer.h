@@ -71,5 +71,7 @@ void internal_timer_setup_capture(int timer_num,
                                   enum internal_timer_capture_number cap_num,
                                   enum internal_timer_capture_edge edge,
                                   internal_timer_callback* cb);
+void internal_timer_set_match_output(int timer_num, enum internal_timer_match_number match_num);
+void internal_timer_clr_match_output(int timer_num, enum internal_timer_match_number match_num);
 
 #endif /* INCLUDE_TIMER_H_ */

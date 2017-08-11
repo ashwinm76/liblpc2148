@@ -8,6 +8,8 @@
 #ifndef INCLUDE_VIC_H_
 #define INCLUDE_VIC_H_
 
+#include "LPC214x.h"
+
 enum vic_interrupt_type
 {
   VIC_INT_IRQ = 0,
@@ -42,9 +44,17 @@ enum vic_interrupt_source
 
 typedef void vic_isr(void);
 
-void vic_interrupt_enable(unsigned long mask);
-void vic_interrupt_disable(unsigned long mask);
 void vic_setup_isr(enum vic_interrupt_source src, enum vic_interrupt_type type, unsigned int priority, vic_isr *isr);
 void vic_set_default_isr(vic_isr *isr);
+
+inline void vic_interrupt_enable(unsigned long mask)
+{
+  VICIntEnable |= mask;
+}
+
+inline void vic_interrupt_disable(unsigned long mask)
+{
+  VICIntEnClr = mask;
+}
 
 #endif /* INCLUDE_VIC_H_ */
