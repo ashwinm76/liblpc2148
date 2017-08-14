@@ -69,8 +69,6 @@ unsigned long fractional_divisor_table[] =
         0x71 // 57600 baud
     };
 
-static void uart0_isr();
-static void uart1_isr();
 static void fill_tx_fifo(int uart_num);
 static void write_tx_buffer(int uart_num, char c);
 
@@ -286,12 +284,12 @@ static void uart_isr(int uart_num, volatile unsigned long *uart_base)
   }
 }
 
-static void uart0_isr()
+void uart0_isr()
 {
   uart_isr(0, (unsigned long*)UART0_BASE_ADDR);
 }
 
-static void uart1_isr()
+void uart1_isr()
 {
   uart_isr(1, (unsigned long*)UART1_BASE_ADDR);
 }

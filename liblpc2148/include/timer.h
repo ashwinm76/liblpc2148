@@ -65,7 +65,6 @@ void internal_timer_setup_match(int timer_num,
                                    enum internal_timer_match_number match_num,
                                    enum internal_timer_match_action action,
                                    enum internal_timer_ext_match_action ext_action,
-                                   int oneshot,
                                    internal_timer_callback* cb);
 void internal_timer_setup_capture(int timer_num,
                                   enum internal_timer_capture_number cap_num,
@@ -73,5 +72,7 @@ void internal_timer_setup_capture(int timer_num,
                                   internal_timer_callback* cb);
 void internal_timer_set_match_output(int timer_num, enum internal_timer_match_number match_num);
 void internal_timer_clr_match_output(int timer_num, enum internal_timer_match_number match_num);
+int internal_timer_get_match_output(int timer_num, enum internal_timer_match_number match_num);
+void internal_timer_toggle_match_output(int timer_num, enum internal_timer_match_number match_num);
 
 #endif /* INCLUDE_TIMER_H_ */

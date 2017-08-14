@@ -106,6 +106,12 @@ void internal_timer_reset(int timer_num)
           (volatile unsigned long *) TMR1_BASE_ADDR);
 
   *(timer_base + TIMER_TCR) = 2;
+
+  // Wait for the timer to reset.
+  while(*(timer_base + TIMER_TC) != 0)
+  {
+
+  }
 }
 
 unsigned long internal_timer_read(int timer_num)
@@ -124,7 +130,6 @@ void internal_timer_setup_match(int timer_num,
                                    enum internal_timer_match_number match_num,
                                    enum internal_timer_match_action action,
                                    enum internal_timer_ext_match_action ext_action,
-                                   int oneshot,
                                    internal_timer_callback* cb)
 {
   unsigned long mr;
@@ -146,11 +151,11 @@ void internal_timer_setup_match(int timer_num,
     *(timer_base + mr) = period;
 
     // Configure external match
-    *(timer_base + TIMER_EMR) &= ~3 << (4 + (2 * match_num));
+    *(timer_base + TIMER_EMR) = (*(timer_base + TIMER_EMR) & (~3 << (4 + (2 * match_num)))) & 0xfff;
     *(timer_base + TIMER_EMR) |= ext_action << (4 + (2 * match_num));
 
     // Interrupt (if required) and reset the timer on match
-    *(timer_base + TIMER_MCR) &= ~7 << (3 * match_num);
+    *(timer_base + TIMER_MCR) = (*(timer_base + TIMER_MCR) & (~7 << (3 * match_num))) & 0xfff;
     if (cb)
     {
       match_callbacks[timer_num][match_num] = cb;
@@ -174,7 +179,7 @@ void internal_timer_setup_capture(int timer_num,
           (volatile unsigned long *) TMR1_BASE_ADDR);
 
   // Set up the capture edge and interrupt (if required)
-  *(timer_base + TIMER_CCR) &= ~7 << (3 * cap_num);
+  *(timer_base + TIMER_CCR) = (*(timer_base + TIMER_CCR) & (~7 << (3 * cap_num))) & 0xfff;
   if (cb)
   {
     match_callbacks[timer_num][4+cap_num] = cb;
@@ -208,6 +213,28 @@ void internal_timer_clr_match_output(int timer_num, enum internal_timer_match_nu
   *(timer_base + TIMER_EMR) = (*(timer_base + TIMER_EMR) & ~(1 << match_num)) & 0xfff;
 }
 
+int internal_timer_get_match_output(int timer_num, enum internal_timer_match_number match_num)
+{
+  volatile unsigned long *timer_base;
+  timer_base = (
+      timer_num == 0 ?
+          (volatile unsigned long *) TMR0_BASE_ADDR :
+          (volatile unsigned long *) TMR1_BASE_ADDR);
+
+  return (*(timer_base + TIMER_EMR) >>  match_num) & 1;
+}
+
+void internal_timer_toggle_match_output(int timer_num, enum internal_timer_match_number match_num)
+{
+  volatile unsigned long *timer_base;
+  timer_base = (
+      timer_num == 0 ?
+          (volatile unsigned long *) TMR0_BASE_ADDR :
+          (volatile unsigned long *) TMR1_BASE_ADDR);
+
+  *(timer_base + TIMER_EMR) = (*(timer_base + TIMER_EMR) ^ (1 << match_num)) & 0xfff;
+}
+
 static void internal_timer0_isr()
 {
 #define TIMER_BASE ((volatile unsigned long*)TMR0_BASE_ADDR)
@@ -218,7 +245,7 @@ static void internal_timer0_isr()
 
   // Read and clear the interrupt bit
   status = *(TIMER_BASE + TIMER_IR);
-  *(TIMER_BASE + TIMER_IR) = status;
+  *(TIMER_BASE + TIMER_IR) = status & 0xff;
 
   // Call the callbacks
   while(status)
@@ -245,7 +272,7 @@ static void internal_timer1_isr()
 
   // Read and clear the interrupt bit
   status = *(TIMER_BASE + TIMER_IR);
-  *(TIMER_BASE + TIMER_IR) = status;
+  *(TIMER_BASE + TIMER_IR) = status & 0xff;
 
   // Call the callbacks
   while(status)

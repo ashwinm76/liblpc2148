@@ -58,5 +58,7 @@ void uart_gets(int uart_num, char *buf, int buf_size);
 void uart_putc(int uart_num, int c);
 void uart_puts(int uart_num, const char *s);
 int uart_rx_count(int uart_num);
+void uart0_isr();
+void uart1_isr();
 
 #endif /* INCLUDE_UART_H_ */
