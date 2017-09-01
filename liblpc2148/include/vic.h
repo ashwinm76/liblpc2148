@@ -47,12 +47,12 @@ typedef void vic_isr(void);
 void vic_setup_isr(enum vic_interrupt_source src, enum vic_interrupt_type type, unsigned int priority, vic_isr *isr);
 void vic_set_default_isr(vic_isr *isr);
 
-inline void vic_interrupt_enable(unsigned long mask)
+static inline void vic_interrupt_enable(unsigned long mask)
 {
   VICIntEnable |= mask;
 }
 
-inline void vic_interrupt_disable(unsigned long mask)
+static inline void vic_interrupt_disable(unsigned long mask)
 {
   VICIntEnClr = mask;
 }
